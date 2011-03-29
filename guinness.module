@@ -1,0 +1,162 @@
+ <?php 
+ /**
+  * Implements hook_menu().
+  */
+
+require ('functions.inc');
+error_reporting(E_ALL);
+ini_set('display_errors', TRUE);
+ini_set('display_startup_errors', TRUE);
+
+// !!!! add guinness to function names
+
+function guinness_menu() { /* implement menu hook */ 
+	$items['guinness-page'] = array(
+	'title' => 'Guinness Goodness',
+	'page callback' => 'generate_content',
+	'access arguments' => array('access content'),
+//	'type' => MENU_CALLBACK,
+  	);
+	$items['guinness-page/%'] = array(
+	'title callback' => 'generate_title',
+	'title arguments' => array(1),
+	'page callback' => 'generate_content',
+	'page arguments' => array(1),
+	'access arguments' => array('access content'),
+//	'type' => MENU_CALLBACK,
+  	);
+ return $items;
+ }
+
+// Create title callback with arg, db lookup for city name
+function generate_title($nid = NULL) { /* generate title */
+	$city = node_load($nid);
+	return t('Great Guinness in ' . $city->title);
+}
+
+ 
+function generate_content($nid = NULL) { /* generate content */
+// Google Maps data structure
+  $map_array = array(
+    'id' => 'example',
+    'maptype' => 'Terrain',
+    'width' => '480px',
+    'height' => '600px',
+    'latitude' => 39.3739522204,
+    'longitude' => -81.5681648254,
+    'zoom' => 4,
+    'align' => 'center',
+    'controltype' => 'Small',
+    'mtc' => 'standard',
+
+    'behavior' => array(
+      'locpick' => FALSE,
+      'nodrag' => FALSE,
+      'nokeyboard' => TRUE,
+      'overview' => FALSE,
+      'scale' => TRUE,
+    ),
+
+    'markers' => array(
+      array(
+        'text' => 'First Marker',
+        'longitude' => 39.3739522204,
+        'latitude' => -81.5681648254,
+        'markername' => 'lblue',
+      ),
+      array(
+        'text' => 'Second Marker',
+        'longitude' => 44.205835001,
+        'latitude' => -70.3674316406,
+        'markername' => 'orange',
+      ),
+    ),
+  );
+
+	$output = '';
+ 	
+ 	/* load current city node */
+//	$nid=1;
+//	if (arg(0) == 'guinness-page' && is_numeric(arg(1))) $nid = arg(1);
+
+	if (!isset($nid)) {
+		$output = "<img src='http://localhost:8888/drupal-7.0/sites/default/files/St_Jamess_Gate_400x300.jpg' 
+			alt='Guinness Goodness' align='middle'>";
+		return $output;
+		}
+//	get city node 
+	if($city_node = node_load($nid)) {
+//		$output .= '<h1>Great Guinness in ' . $city_node->title . "</h1>";
+//		$page_title = 'Great Guinness in ' . $city_node->title;
+//		dsm($city_node);
+	}
+/*	get pub node structure if req'd for analysis purposes
+	$pid=9;
+	if($pub_node = node_load($pid)) {
+		dsm($pub_node);
+	}
+*/	
+
+//	get nids for pubs in current city
+
+ 	$query = "SELECT n.nid FROM {node} n	
+		JOIN {field_data_field_pub_city_ref} f ON f.revision_id = n.nid
+		WHERE n.type = :type
+		AND f.field_pub_city_ref_nid = :city
+		";
+
+	$results = db_query ($query, array(
+				':type' => 'pub',
+				':city' => $nid,
+				));
+
+	$min_lat = 99999;
+	$min_long = 99999;
+	$max_lat = 0;
+	$max_long = 0;
+	$i = 0;
+	$output .= "<UL>";
+
+	foreach($results as $result){
+//		dsm($result);
+
+		$pub_node = node_load($result->nid);
+		$pub_title = $pub_node->title;
+		$pub_address = $pub_node->field_pub_address['und'][0]['value'];
+		$pub_lat = $pub_node->field_pub_lat['und'][0]['value'];
+		$pub_long = $pub_node->field_pub_long['und'][0]['value'];
+		$pub_link = $pub_node->field_pub_link['und'][0]['url'];
+
+		$map_array['markers'][$i]['text'] = $pub_title . "<br>" . $pub_address;
+		$map_array['markers'][$i]['longitude'] = $pub_long;
+		$map_array['markers'][$i]['latitude'] = $pub_lat;
+		$map_array['markers'][$i++]['markername'] = 'green';
+
+		if ($min_lat == 99999) $min_lat = $pub_lat;
+		else if ($pub_lat < $min_lat) $min_lat = $pub_lat;
+		if ($min_long == 99999) $min_long = $pub_long;
+		else if ($pub_long < $min_long) $min_long = $pub_long;
+		if ($max_lat == 0) $max_lat = $pub_lat;
+		else if ($pub_lat > $max_lat) $max_lat = $pub_lat;
+		if ($max_long == 0) $max_long = $pub_long;
+		else if ($pub_long > $max_long) $max_long = $pub_long;
+		$output .= "<b><li><a href=" . $pub_link . ">" . $pub_title . "</a></b><br>" . $pub_address . "</li>";
+	}
+	
+	$long_range = $max_long - $min_long;
+	$lat_range = $max_lat - $min_lat;
+	$ll = min ($long_range, $lat_range);
+	$zoom_level = calculate_zoom_level ($ll);
+
+	$map_array['latitude'] = ($min_lat + $max_lat)/2;
+	$map_array['longitude']  = ($min_long + $max_long)/2;
+	$map_array['zoom'] = $zoom_level;
+	$element = array(
+    	'#type' => 'gmap',
+    	'#gmap_settings' => $map_array,
+  		);
+// 	dsm($element);
+	$output .= "</ul>";
+	$output .= "<div class='map_label'>Click on green callout icons below for pub name & address</div>" . drupal_render($element);
+	return $output;
+}

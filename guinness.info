@@ -1,0 +1,6 @@
+name = Guinness
+description = "Attempt to adapt php code to run under Drupal."
+package = Build a Module
+core = 7.x
+files[] = guinness.module
+files[] = guinness.test

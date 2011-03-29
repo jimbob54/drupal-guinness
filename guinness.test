@@ -1,0 +1,26 @@
+<?php
+class GuinnessTestCase extends DrupalWebTestCase {
+//	protected $user;
+	public static function getInfo() {
+		return array(
+			'name' => 'General functionality',
+			'description' => 'Create, view, edit, delete, and change city entries 
+				and verify their consistency in the database.',
+			'group' => 'Guinness',
+		);
+	}
+
+/**
+  * Enable modules and create users with specific permissions.
+  */
+function setUp() {
+	parent::setUp('guinness');
+	// Create users.
+//	$this->user = $this->drupalCreateUser(array('create city content', 'edit own content', 
+//		'delete own content'));
+	}
+function testDoesDisplay() {
+	$this->drupalGet('guinness-page');
+	$this->assertResponse(200);	
+	}
+}
